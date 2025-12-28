@@ -6,7 +6,7 @@ This project uses DRL methods to determine the best Vancomycin injection for ICU
 
 ```text
 DRL-for-Vancomycin-PK-PD/
-├── data_processing/   # 数据清洗、预处理脚本 (Python, SQL)
+├── data_processing/   # 数据清洗、预处理脚本 (Python)
 ├── algorithms/        # 核心算法模型、训练脚本 (PyTorch)
 ├── software/          # 软件交付物 (Web API, Frontend)
 │   ├── backend/
