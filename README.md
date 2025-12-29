@@ -11,6 +11,6 @@ DRL-for-Vancomycin-PK-PD/
 ├── software/          # 软件交付物 (Web API, Frontend)
 │   ├── backend/
 │   └── frontend/
-├── docs/              # 跨模块的文档说明
+├── original_data      # 原始数据
 ├── .gitignore         # 全局忽略文件
 └── README.md          # 整个项目的总导览
