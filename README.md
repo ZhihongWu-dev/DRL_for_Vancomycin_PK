@@ -1,4 +1,4 @@
-# DRL-for-Vancomycin-PK-PD
+# DRL-for-Vancomycin-PK
 
 This project uses DRL methods to determine the best Vancomycin injection for ICU patients based on MIMIC demo.
 
