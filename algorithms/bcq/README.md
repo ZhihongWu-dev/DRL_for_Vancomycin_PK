@@ -1,7 +1,5 @@
 # BCQ: Batch-Constrained Q-Learning for Offline Reinforcement Learning
 
----
-
 ## Overview
 
 This repository provides a **production-ready implementation** of **BCQ (Batch-Constrained Q-Learning)**, an offline reinforcement learning algorithm designed for safe policy learning from fixed datasets without online interaction.
@@ -300,8 +298,6 @@ The `analysis_bcq_final.ipynb` notebook provides **publication-grade analysis** 
 | BCQ worse than behavior | Insufficient training | Increase `total_steps` |
 | No trend in multi-feature | Feature not predictive | Try different feature |
 | Empty subplots | Feature name mismatch | Check `state_cols` match exactly |
-
----
 
 ---
 
