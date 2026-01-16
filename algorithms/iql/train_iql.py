@@ -20,21 +20,32 @@ def load_config(path: str):
 
 import os
 import time
-try:
-    from torch.utils.tensorboard import SummaryWriter
-except Exception:
-    # Fallback minimal writer if tensorboard is not installed (keeps tests runnable)
-    class SummaryWriter:
-        def __init__(self, log_dir=None):
-            self.log_dir = log_dir
-        def add_scalar(self, *args, **kwargs):
-            return
-        def close(self):
-            return
+import json
 from algorithms.iql.dataset import ReadyDataset, ReplayBuffer
 from algorithms.iql.models import QNetwork, VNetwork, GaussianPolicy, init_model_weights
 from algorithms.iql.train_utils import iql_update_step
 from algorithms.iql.utils import set_seed, get_device
+
+
+class SimpleLogger:
+    """Simple JSON logger to replace TensorBoard"""
+    def __init__(self, log_dir=None):
+        self.log_dir = log_dir
+        self.metrics = []
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+            self.log_file = os.path.join(log_dir, "training_log.json")
+        else:
+            self.log_file = None
+    
+    def add_scalar(self, tag, value, step):
+        self.metrics.append({"step": step, "tag": tag, "value": float(value)})
+    
+    def close(self):
+        if self.log_file:
+            with open(self.log_file, 'w') as f:
+                json.dump(self.metrics, f, indent=2)
+            print(f"Training log saved to: {self.log_file}")
 
 
 def run_training(cfg: dict, workdir: str = None) -> str:
@@ -98,7 +109,7 @@ def run_training(cfg: dict, workdir: str = None) -> str:
     # logging
     workdir = workdir or cfg.get("workdir", f"runs/iql_{int(time.time())}")
     os.makedirs(workdir, exist_ok=True)
-    writer = SummaryWriter(log_dir=workdir)
+    logger = SimpleLogger(log_dir=workdir)
 
     # training loop
     for step in range(1, total_steps + 1):
@@ -115,9 +126,9 @@ def run_training(cfg: dict, workdir: str = None) -> str:
 
         if step % log_interval == 0 or step == 1:
             print(f"[step {step}] q_loss={losses['q_loss'].item():.6f} v_loss={losses['v_loss'].item():.6f} pi_loss={losses['pi_loss'].item():.6f}")
-            writer.add_scalar("loss/q", losses['q_loss'].item(), step)
-            writer.add_scalar("loss/v", losses['v_loss'].item(), step)
-            writer.add_scalar("loss/pi", losses['pi_loss'].item(), step)
+            logger.add_scalar("loss/q", losses['q_loss'].item(), step)
+            logger.add_scalar("loss/v", losses['v_loss'].item(), step)
+            logger.add_scalar("loss/pi", losses['pi_loss'].item(), step)
 
         if step % ckpt_interval == 0 or step == total_steps:
             ckpt_path = os.path.join(workdir, f"ckpt_step{step}.pt")
@@ -133,7 +144,7 @@ def run_training(cfg: dict, workdir: str = None) -> str:
             }, ckpt_path)
             print(f"Saved checkpoint: {ckpt_path}")
 
-    writer.close()
+    logger.close()
     return ckpt_path
 
 
