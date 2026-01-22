@@ -12,7 +12,7 @@
 
 
 data:
-  path: intermediate_data/ready_data.csv
+  path: intermediate_data/ready_data.xlsx
   sheet: 0
   state_cols:
     - vanco_level(ug/mL)
