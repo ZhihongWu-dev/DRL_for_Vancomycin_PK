@@ -68,11 +68,11 @@ V(s) = Q的τ-分位数, τ=0.7 (70th percentile)
   其中 ρ_τ(x) = |τ - 𝟙(x<0)| * x²
   
 效果对比:
-  x > 0 (Q > V): 使用权重 τ=0.7
-  x < 0 (Q < V): 使用权重 1-τ=0.3
+  x > 0 (Q > V): 使用权重 1-τ=0.3
+  x < 0 (Q < V): 使用权重 τ=0.7
   
-  这样当Q > V时损失权重更大
-  →强制V不要高估太多
+  这样当Q < V时损失权重更大
+  →更强地惩罚V过高，推动V向τ分位靠近
 ```
 
 **医疗含义**：
@@ -142,7 +142,7 @@ Q_optimizer.step()
 平庸的历史给药 → 弱化学习
 
 实现:
-  w_t = exp(β * A_t)
+  w_t = exp(A_t / β)
   
   其中 β=0.5 (温度参数)
        A_t = Q(s,a) - V(s) (优势)
@@ -241,7 +241,7 @@ AWR学习后:
 三个损失函数:
     ├─ L_Q = MSE(Q_pred, Q_target)
     ├─ L_V = Expectile(Q-V, τ=0.7)
-    └─ L_π = -log π(a|s) × exp(β×A)
+    └─ L_π = -log π(a|s) × exp(A/β)
 ```
 
 ---
@@ -1234,7 +1234,7 @@ def iql_update_policy(batch, q_net, v_net, pi_net, beta=0.5):
         advantage = q_vals - v_vals
         
         # 计算权重
-        weight = torch.exp(beta * advantage)
+        weight = torch.exp(advantage / beta)
         weight = torch.clamp(weight, max=100)  # 防止爆炸
     
     # 策略输出(高斯分布)
@@ -1352,7 +1352,7 @@ for step in range(config['total_steps']):
    L_Q = MSE(q, q_target)
    L_V = Expectile(q - v, τ=0.7)
    advantage = q - v
-   weight = exp(β × advantage)
+  weight = exp(advantage / β)
    L_π = -log π(a|s) × weight
 
 5. 反向传播:
@@ -1455,9 +1455,9 @@ AWR中的超参数:
 
 **部分缓解**:
 ```
-减小beta (0.5 → 0.3):
-  权重: exp(β×A)
-  beta小 → 权重更均匀
+增大beta (0.5 → 1.0):
+  权重: exp(A/β)
+  beta大 → 权重更均匀
   → 损失更稳定
   
 但完全解决需要:

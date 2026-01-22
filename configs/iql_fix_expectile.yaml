@@ -1,0 +1,60 @@
+# IQL配置 - 修复 Expectile 约束
+# 
+# 问题诊断（exp_stable_v3）：
+#   ✅ 数值稳定性已达成: std(Q-V)=4.32, max(Q-V)=10.35
+#   ❌ Expectile 约束被破坏: Positive%=7.5% (目标30%)
+#   ❌ V 系统性过高: mean(Q-V)=-6.72, Q75(Q-V)=-4.46
+#
+# 根本原因：
+#   V 网络学习率太高，导致 V "爬到 Q 的上包络"
+#   V 不再满足 tau=0.7 的 expectile 约束
+#
+# 修复策略：
+#   1. 🔧 降低 V 学习率到 0.3x (从 0.0001 → 0.00003)
+#   2. 🔧 保持所有数值稳定化措施
+#   3. 🔧 增强监控：Q-V 分位数 (Q25/Q50/Q75)
+#   4. 🔧 Expectile 约束验证：P(Q>V) ≈ 1-tau
+#
+# 期望结果（tau=0.7）:
+#   Positive%   ≈ 28% ~ 32%  (1-tau)
+#   Q70(Q-V)    ≈ 0
+#   Q75(Q-V)    ≈ 1 ~ 3 (小正数)
+#   Mean(Q-V)   ≈ -2 ~ 0
+#   Std(Q-V)    ≈ 3 ~ 8
+#   Max(Q-V)    ≈ 10 ~ 15
+
+data:
+  path: intermediate_data/ready_data.csv
+  sheet: 0
+  state_cols:
+    - vanco_level(ug/mL)
+    - creatinine(mg/dL)
+    - wbc(K/uL)
+    - bun(mg/dL)
+    - temperature
+    - sbp
+    - heart_rate
+
+train:
+  seed: 42
+  total_steps: 12000              # 稍微延长训练
+  batch_size: 64
+  log_interval: 50
+  ckpt_interval: 500
+  buffer_capacity: 10000
+  policy_warmup_steps: 3000       # 前3000步冻结policy
+
+model:
+  hidden: [256, 256]
+  lr: 0.0001                      # Q 和 Pi 学习率
+  v_lr_ratio: 0.3                 # 🔧 V lr = 0.3 * Q lr = 0.00003
+  gamma: 0.99
+  tau: 0.7                        # V = 70%分位数 -> 期望30% positive
+  beta: 1.0                       # 保守的beta
+  weight_clip: 20.0
+  reward_scale: 0.1               # 缩放reward防止Q爆炸
+  use_target_q: true              # 启用target Q network
+  target_update_rate: 0.005       # Polyak averaging rate
+
+workdir: algorithms/iql/runs/exp_fix_expectile
+

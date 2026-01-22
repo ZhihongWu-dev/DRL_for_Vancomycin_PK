@@ -1,0 +1,49 @@
+# IQL配置 - 全面稳定化版本
+# 
+# 修复内容（基于详细诊断）:
+# 1. ✅ Reward scaling (0.1x) - 防止Q值爆炸
+# 2. ✅ Target Q network (EMA) - 稳定Q学习
+# 3. ✅ 冻结policy 3000步 - 先稳定Q/V
+# 4. ✅ 裁剪Q-V到[-10, 10]
+# 5. ✅ 裁剪policy权重到max=20
+# 6. ✅ Beta降到1.0 - 更保守的AWR
+#
+# 目标尺度（健康训练应看到）:
+#   Mean(Q-V)   ≈ -2 ~ 0
+#   Std(Q-V)    ≈ 3 ~ 8
+#   Max(Q-V)    ≈ 10 ~ 15
+#   Positive%   ≈ 30% (1-tau)
+
+data:
+  path: intermediate_data/ready_data.csv
+  sheet: 0
+  state_cols:
+    - vanco_level(ug/mL)
+    - creatinine(mg/dL)
+    - wbc(K/uL)
+    - bun(mg/dL)
+    - temperature
+    - sbp
+    - heart_rate
+
+train:
+  seed: 42
+  total_steps: 10000              # 充分训练
+  batch_size: 64
+  log_interval: 50
+  ckpt_interval: 500
+  buffer_capacity: 10000
+  policy_warmup_steps: 3000       # 🔧 前3000步冻结policy，只训Q/V
+
+model:
+  hidden: [256, 256]
+  lr: 0.0001                      # 🔧 降低学习率
+  gamma: 0.99
+  tau: 0.7                        # V = 70%分位数 -> 期望30% positive
+  beta: 1.0                       # 🔧 更保守的beta
+  weight_clip: 20.0
+  reward_scale: 0.1               # 🔧 缩放reward防止Q爆炸
+  use_target_q: true              # 🔧 启用target Q network
+  target_update_rate: 0.005       # Polyak averaging rate
+
+workdir: algorithms/iql/runs/exp_stable_v3

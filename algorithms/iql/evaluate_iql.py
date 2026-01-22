@@ -42,9 +42,9 @@ def load_checkpoint(ckpt_path: str, state_dim: int, action_dim: int, hidden: lis
     return q_net, v_net, pi_net
 
 
-def evaluate_offline(dataset: ReadyDataset, q_net, v_net, pi_net, gamma=0.99):
+def evaluate_offline(dataset: ReadyDataset, q_net, v_net, pi_net, gamma=0.99, normalize_states: bool = True):
     """在数据集上计算离线评估指标"""
-    trans_df = dataset.to_transitions()
+    trans_df = dataset.to_transitions(normalize=normalize_states)
     
     # 转换为张量
     states = torch.FloatTensor(np.stack(trans_df['s'].values))
@@ -158,6 +158,7 @@ def main():
         df=df,
         state_cols=cfg['data']['state_cols']
     )
+    dataset.fit_normalizer()
     
     state_dim = len(cfg['data']['state_cols'])
     action_dim = 1
@@ -173,7 +174,7 @@ def main():
     
     # 评估
     print("\n开始评估...")
-    results = evaluate_offline(dataset, q_net, v_net, pi_net, cfg['model']['gamma'])
+    results = evaluate_offline(dataset, q_net, v_net, pi_net, cfg['model']['gamma'], normalize_states=True)
     
     # 打印结果
     print_evaluation(results)

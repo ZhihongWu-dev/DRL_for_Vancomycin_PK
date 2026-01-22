@@ -41,20 +41,45 @@ class VNetwork(nn.Module):
 
 
 class GaussianPolicy(nn.Module):
-    def __init__(self, state_dim: int, action_dim: int = 1, hidden=(256, 256)):
+    def __init__(self, state_dim: int, action_dim: int = 1, hidden=(256, 256), 
+                 action_range=None):
+        """
+        Gaussian policy for continuous actions.
+        
+        Args:
+            state_dim: dimension of state
+            action_dim: dimension of action (default=1)
+            hidden: hidden layer sizes
+            action_range: tuple (min, max) for action bounds in normalized space.
+                         If None, no bounds are applied. Common: (-3, 3) for normalized actions
+        """
         super().__init__()
         self.net = MLP(state_dim, action_dim * 2, hidden=hidden)  # mean and logstd
+        self.action_range = action_range
 
     def forward(self, s: torch.Tensor):
         out = self.net(s)
         mean, logstd = out.chunk(2, dim=-1)
-        std = logstd.clamp(-20, 2).exp()
+        
+        # Optional: bound mean to valid action range (in normalized space)
+        if self.action_range is not None:
+            mean = torch.clamp(mean, self.action_range[0], self.action_range[1])
+        
+        # Stabilize std: limit logstd range and enforce minimum std
+        logstd = logstd.clamp(-5, 2)
+        std = torch.clamp(logstd.exp(), min=0.1)
         return mean, std
 
     def sample(self, s: torch.Tensor):
         mean, std = self.forward(s)
         eps = torch.randn_like(mean)
-        return mean + eps * std
+        action = mean + eps * std
+        
+        # Clip sampled action to valid range if specified
+        if self.action_range is not None:
+            action = torch.clamp(action, self.action_range[0], self.action_range[1])
+        
+        return action
 
 # convenience helper to initialize model weights using utilities
 from algorithms.iql.utils import init_weights

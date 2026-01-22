@@ -82,12 +82,12 @@ V(s) = τ-expectile of Q(s, a)
 
 **优势加权回归 (AWR)**:
 ```python
-权重 = exp(β × Advantage(s,a))
+权重 = exp(Advantage(s,a) / β)
 Advantage(s,a) = Q(s,a) - V(s)
 ```
 
-- `β` 小 (如0.5): 对好动作的关注非常集中 → **更激进**
-- `β` 大 (如10.0): 对好动作的关注更平滑 → **更保守稳定**
+- `β` 小 (如0.5): 权重差异更大 → **更激进**
+- `β` 大 (如10.0): 权重差异更小 → **更保守稳定**
 
 ### IQL训练流程
 
@@ -103,52 +103,62 @@ Advantage(s,a) = Q(s,a) - V(s)
    L_Q = MSE(Q(s,a), r + γ·V(s'))
    ↓
 4. 更新策略网络 (优势加权)
-   权重 = exp(β × [Q(s,a) - V(s)])
+   权重 = exp([Q(s,a) - V(s)] / β)
    L_π = -权重 × log π(a|s)
    ↓
 5. 重复直到收敛
 ```
 
-### 当前模型行为分析
+### 策略诊断提示
 
-**观察到的问题**:
-- 贪心策略倾向于给**最大剂量** (action=1.0)
-- 相对行为策略改进仅 **-5.1%**
+如果策略出现过于激进或动作塌缩，优先检查：
 
-**可能原因**:
-1. **τ=0.7 太乐观**: V值过高，导致策略过于激进
-2. **β=0.5 太小**: AWR权重过于集中在极端优势动作
-3. **奖励函数问题**: 所有奖励都是负值，可能没有明确的"好"行为信号
-4. **数据偏差**: 历史数据可能本身就倾向高剂量
+1. **Q−V 分布** 是否失衡（`positive_rate` 偏离 $1-\tau$）
+2. **优势权重** 是否爆炸（`max_weight` 与 `max(Q−V)`）
+3. **奖励尺度** 是否过大/过小（`reward_scale`）
+4. **V 学习率** 是否过高（`v_lr_ratio`）
 
-**改进方向** → 见[IQL_DETAILED_GUIDE.md](IQL_DETAILED_GUIDE.md)的"调参经验"章节
+调参建议见 [IQL_DETAILED_GUIDE.md](IQL_DETAILED_GUIDE.md) 的"调参经验"章节。
 
 ---
 
 ## 🎯 项目成果
 
 ### ✅ 核心实现
-- **数据处理**: 2102个有效临床转移（7个状态特征）
-- **神经网络**: Q/V/Policy三网络架构 ([32,32]隐藏层)
+- **数据处理**: 临床转移样本 + 7维状态特征
+- **神经网络**: Q/V/Policy 三网络架构
 - **训练系统**: 完整管道 + 检查点 + JSON日志
-- **离线评估**: 价值函数和策略质量评估
-- **可视化分析**: 交互式策略分析notebook
+- **离线评估**: 价值函数与策略质量评估
+- **可视化分析**: 交互式策略分析 notebook
 
-### 📊 最新训练结果 (exp_conservative, 5000步)
+### 📊 训练监控指标（推荐）
 
-| 指标 | 初始值 | 最终值 | 最小值 | 状态 |
-|------|--------|--------|--------|------|
-| **Q损失** | 34.73 | 2.17 | 0.82 (步数4550) | ✅ 收敛 |
-| **V损失** | 9.58 | 0.06 | 0.01 (步数300) | ✅ 收敛 |
-| **策略损失** | 0.05 | 1199.65 | - | ⚠️ 波动（正常）|
+重点关注 **Q−V 分布** 与策略稳定性：
 
-**评估指标**:
-- 贪心策略Q值: **-122.63**
-- 平均V值: **-136.74**
-- 相对改进: **-5.1%**
-- 平均奖励: **-0.74**
+- `positive_rate ≈ 1 - τ`
+- `mean(Q−V)` 接近 0（略正或略负都可）
+- `std(Q−V)` 处于中等范围（避免过大/过小）
+- `max(Q−V)` 不出现爆炸
 
-**当前检查点**: [runs/exp_conservative/ckpt_step5000.pt](runs/exp_conservative/ckpt_step5000.pt)
+训练日志会写入 [runs/<exp_name>/training_log.json](runs/) 并在控制台打印。
+
+---
+
+## 🧩 训练策略与稳定化
+
+为保证离线训练稳定性，当前实现采用以下策略：
+
+1. **Target Q 网络 (EMA)**：缓解Q值震荡与发散
+2. **Reward Scale**：缩放奖励以避免Q爆炸
+3. **Policy/Q warmup**：先训练Q/V，再启用策略更新
+4. **V学习率更低**：通过 `v_lr_ratio` 限制V过冲
+5. **优势与权重裁剪**：限制 `Q−V` 和 `exp((Q−V)/β)` 的极值
+6. **梯度裁剪**：对Q/V/Policy统一裁剪
+7. **分布监控**：持续记录 `mean/std/max(Q−V)` 与 `positive_rate`
+
+这些策略的实现位置：
+- 训练步更新与监控: [train_utils.py](train_utils.py)
+- 训练主循环与日志: [train_iql.py](train_iql.py)
 
 ---
 
@@ -176,10 +186,11 @@ algorithms/iql/
 │   └── analysis.ipynb        # 交互式分析notebook
 │
 ├── ⚙️ 配置文件 (../configs/)
-│   ├── iql_base.yaml         # 基础配置
-│   ├── iql_conservative.yaml # 保守配置（当前）
-│   ├── iql_run_ok.yaml       # 另一个实验配置
-│   └── iql_tuned.yaml        # 调优配置
+│   ├── iql_base.yaml          # 基础配置
+│   ├── iql_fixed*.yaml        # 修复/稳定化实验
+│   ├── iql_stable*.yaml       # 稳定训练配置
+│   ├── iql_tuned.yaml         # 调优配置
+│   └── iql_v_alignment_test.yaml # V 对齐实验
 │
 ├── 🧪 测试
 │   └── tests/
@@ -190,17 +201,16 @@ algorithms/iql/
 │
 ├── 📦 训练输出
 │   └── runs/
-│       ├── exp_conservative/    # 当前最佳实验
-│       │   ├── ckpt_step*.pt   # 模型检查点
-│       │   ├── training_log.json  # 训练日志
-│       │   └── eval_results.json  # 评估结果
-│       ├── exp_manual_ok/
-│       └── exp_tuned/
+│       └── <exp_name>/
+│           ├── ckpt_step*.pt      # 模型检查点
+│           ├── training_log.json  # 训练日志
+│           └── eval_results.json  # 评估结果
 │
 └── 📄 文档
-    ├── README.md              # 本文档
-    ├── IQL_DETAILED_GUIDE.md  # 详细技术指南（含调参经验）
-    └── MODEL_EXPORT_README.md # 模型导出指南
+   ├── README.md              # 本文档
+   ├── IQL_DETAILED_GUIDE.md  # 详细技术指南（含调参经验）
+   ├── ACTION_SPACE_README.md # 动作空间说明
+   └── MODEL_EXPORT_README.md # 模型导出指南
 ```
 
 ### 关键类和函数
@@ -209,12 +219,12 @@ algorithms/iql/
 ```python
 class QNetwork(nn.Module)      # Q(s,a) 网络
 class VNetwork(nn.Module)      # V(s) 网络  
-class PolicyNetwork(nn.Module)  # π(a|s) 网络（高斯策略）
+class GaussianPolicy(nn.Module)  # π(a|s) 网络（高斯策略）
 ```
 
 #### `losses.py`
 ```python
-def expectile_loss(diff, expectile=0.7)  # Expectile回归损失
+def expectile_loss(v, q, tau)            # Expectile回归损失
 def iql_update_step(...)                 # 单步IQL更新
 ```
 
@@ -236,8 +246,8 @@ class ReplayBuffer              # 经验回放缓冲区
 
 ### 1. 训练新模型
 ```bash
-# 使用保守配置
-python -m algorithms.iql.train_iql --config configs/iql_conservative.yaml
+# 选择任一配置文件
+python -m algorithms.iql.train_iql --config configs/iql_base.yaml
 
 # 训练会在 runs/<exp_name>/ 下生成:
 #   - ckpt_step*.pt: 模型检查点
@@ -247,7 +257,7 @@ python -m algorithms.iql.train_iql --config configs/iql_conservative.yaml
 ### 2. 查看训练曲线
 ```bash
 python -m algorithms.iql.plot_training_log \
-  --log-file runs/exp_conservative/training_log.json
+   --log-file runs/<exp_name>/training_log.json
 
 # 生成 training_curves.png
 ```
@@ -255,9 +265,9 @@ python -m algorithms.iql.plot_training_log \
 ### 3. 评估模型
 ```bash
 python -m algorithms.iql.evaluate_iql \
-  --checkpoint runs/exp_conservative/ckpt_step5000.pt \
-  --config configs/iql_conservative.yaml \
-  --output eval_results.json
+   --checkpoint runs/<exp_name>/ckpt_stepXXXX.pt \
+   --config configs/iql_base.yaml \
+   --output eval_results.json
 
 # 生成评估指标:
 #   - greedy_q: 贪心策略Q值
@@ -268,9 +278,9 @@ python -m algorithms.iql.evaluate_iql \
 ### 4. 导出模型
 ```bash
 python -m algorithms.iql.export_model \
-  --checkpoint runs/exp_conservative/ckpt_step5000.pt \
-  --output exported_models/iql_model.pth \
-  --test
+   --checkpoint runs/<exp_name>/ckpt_stepXXXX.pt \
+   --output exported_models/iql_model.pth \
+   --test
 
 # 生成独立的.pth文件，包含:
 #   - 模型权重

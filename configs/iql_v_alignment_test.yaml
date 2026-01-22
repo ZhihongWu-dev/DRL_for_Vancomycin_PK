@@ -1,0 +1,55 @@
+# IQL配置 - V 对齐实验（冻结 Q，只训 V）
+# 
+# 目的：
+#   验证 V loss 实现是否正确
+#   在固定 Q 的情况下，V 是否能收敛到 tau-expectile
+#
+# 实验设置：
+#   - 完全冻结 Q 网络（不更新）
+#   - 完全冻结 Policy 网络（不更新）
+#   - 只训练 V 网络
+#   - 观察 Positive% 是否 → 30%
+#
+# 如果成功：
+#   Positive% 应稳定在 28%-32%
+#   证明 V loss 实现正确
+#
+# 如果失败：
+#   说明 V loss 或 tau 传值有问题
+
+data:
+  path: intermediate_data/ready_data.csv
+  sheet: 0
+  state_cols:
+    - vanco_level(ug/mL)
+    - creatinine(mg/dL)
+    - wbc(K/uL)
+    - bun(mg/dL)
+    - temperature
+    - sbp
+    - heart_rate
+
+train:
+  seed: 42
+  total_steps: 5000               # 短期实验
+  batch_size: 64
+  log_interval: 20
+  ckpt_interval: 500
+  buffer_capacity: 10000
+  policy_warmup_steps: 10000      # 🔧 永远冻结 policy
+  q_warmup_steps: 10000           # 🔧 永远冻结 Q（需要添加此参数支持）
+
+model:
+  hidden: [256, 256]
+  lr: 0.0001                      # Q 学习率（但不会用到）
+  v_lr_ratio: 0.3                 # V lr = 0.00003
+  gamma: 0.99
+  tau: 0.7                        # 验证：期望 30% positive
+  beta: 1.0
+  weight_clip: 20.0
+  reward_scale: 0.1
+  use_target_q: false             # 不需要 target Q（Q 不更新）
+  target_update_rate: 0.005
+
+workdir: algorithms/iql/runs/exp_v_alignment_test
+

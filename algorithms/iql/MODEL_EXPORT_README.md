@@ -16,7 +16,7 @@
 
 ```bash
 python algorithms/iql/export_model.py \
-    --checkpoint algorithms/iql/runs/exp_conservative/ckpt_step3000.pt \
+    --checkpoint algorithms/iql/runs/<exp_name>/ckpt_stepXXXX.pt \
     --output algorithms/iql/exported_models/iql_model.pth \
     --test
 ```
@@ -26,7 +26,7 @@ python algorithms/iql/export_model.py \
 - `--output`: 输出模型文件路径
 - `--state-dim`: 状态维度（默认7）
 - `--action-dim`: 动作维度（默认1）
-- `--hidden`: 隐藏层配置（默认[32, 32]）
+- `--hidden`: 隐藏层配置（默认见训练配置）
 - `--test`: 导出后测试模型
 
 ### 2. 测试模型
@@ -102,11 +102,12 @@ print(f"状态价值: {v_value:.4f}")
 
 ## 模型配置
 
-- **状态维度**: 7（vanco_level, creatinine, wbc, bun, temperature, sbp, heart_rate）
-- **动作维度**: 1（万古霉素剂量，标准化后范围[-1, 1]）
-- **网络结构**: [32, 32]两层隐藏层
-- **训练步数**: 3000
-- **源checkpoint**: `exp_conservative/ckpt_step3000.pt`
+模型结构与训练配置一致，导出文件中会包含完整的 `model_config` 与训练信息。
+
+- **状态维度**: 由数据列决定（通常为7维）
+- **动作维度**: 1（万古霉素剂量，标准化后输出）
+- **网络结构**: 由训练配置 `model.hidden` 决定
+- **训练步数**: 以导出时选择的 checkpoint 为准
 
 ## 模型文件结构
 
@@ -129,7 +130,7 @@ print(f"状态价值: {v_value:.4f}")
 }
 ```
 
-## 测试结果示例
+## 测试结果示例（示意）
 
 ### 临床案例测试
 
@@ -142,15 +143,15 @@ print(f"状态价值: {v_value:.4f}")
 
 ### 数据集评估
 
-在50个样本上的统计：
-- 预测动作均值: 1.00（标准化）
-- 状态价值均值: -117.79
+在若干样本上的统计（示意）：
+- 预测动作均值: 取决于策略与数据分布
+- 状态价值均值: 取决于训练尺度与奖励设计
 
 ## 注意事项
 
 1. **PyTorch版本兼容性**: 需要PyTorch 2.6+，使用`weights_only=True`安全加载
-2. **动作范围**: 模型输出为标准化动作[-1, 1]，需要反标准化到实际剂量
-3. **贪心策略倾向**: 当前模型倾向于推荐最大剂量，建议进一步调整或添加约束
+2. **动作范围**: 模型输出为标准化动作，需要反标准化到实际剂量
+3. **贪心策略倾向**: 若出现极端剂量倾向，需结合 `action_range` 与奖励/约束调整
 4. **临床验证**: 使用前需要在临床模拟器上充分验证
 
 ## 下一步

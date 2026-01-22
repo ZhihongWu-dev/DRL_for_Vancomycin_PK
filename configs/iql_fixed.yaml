@@ -1,0 +1,32 @@
+# IQL修复后的配置
+# 修复了策略损失函数的bug后重新训练
+
+data:
+  path: intermediate_data/ready_data.csv
+  sheet: 0
+  state_cols:
+    - vanco_level(ug/mL)
+    - creatinine(mg/dL)
+    - wbc(K/uL)
+    - bun(mg/dL)
+    - temperature
+    - sbp
+    - heart_rate
+
+train:
+  seed: 42
+  total_steps: 3000           # 训练步数
+  batch_size: 64              
+  log_interval: 50
+  ckpt_interval: 300
+  buffer_capacity: 10000
+
+model:
+  hidden: [256, 256]          # 标准网络大小
+  lr: 0.0003                  # 标准学习率
+  gamma: 0.99                 # 折扣因子
+  tau: 0.7                    # expectile参数
+  beta: 10.0                  # AWR温度系数 (更大=更保守，稳定训练)
+  weight_clip: 100.0
+
+workdir: algorithms/iql/runs/exp_fixed

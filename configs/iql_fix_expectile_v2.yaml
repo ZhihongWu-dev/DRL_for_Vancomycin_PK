@@ -1,0 +1,52 @@
+# IQL配置 - Expectile 约束修复 v2
+#
+# 背景：
+#   exp_stable_v3 数值稳定但 Positive% 偏低（V 偏高）
+#   目标：保持稳定性，同时将 Positive% 拉回到 ~30%
+#
+# 调整策略：
+#   1) reward_scale 提高到 0.2 → 提升 Q 值整体水平
+#   2) v_lr_ratio 设为 0.6 → V 学习不过快但不至于过慢
+#   3) 保持 target Q、warmup、权重裁剪等稳定化措施
+#   4) 训练步数延长到 20000
+#
+# 期望结果（tau=0.7）：
+#   Positive%   ≈ 28% ~ 32%  (1-tau)
+#   Mean(Q-V)   ≈ -2 ~ 0
+#   Std(Q-V)    ≈ 3 ~ 8
+#   Max(Q-V)    ≈ 10 ~ 15
+
+data:
+  path: intermediate_data/ready_data.csv
+  sheet: 0
+  state_cols:
+    - vanco_level(ug/mL)
+    - creatinine(mg/dL)
+    - wbc(K/uL)
+    - bun(mg/dL)
+    - temperature
+    - sbp
+    - heart_rate
+
+train:
+  seed: 42
+  total_steps: 20000
+  batch_size: 64
+  log_interval: 50
+  ckpt_interval: 500
+  buffer_capacity: 10000
+  policy_warmup_steps: 3000
+
+model:
+  hidden: [256, 256]
+  lr: 0.0001
+  v_lr_ratio: 0.6
+  gamma: 0.99
+  tau: 0.7
+  beta: 1.0
+  weight_clip: 20.0
+  reward_scale: 0.2
+  use_target_q: true
+  target_update_rate: 0.005
+
+workdir: algorithms/iql/runs/exp_fix_expectile_v2
