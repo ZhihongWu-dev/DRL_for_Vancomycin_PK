@@ -110,9 +110,3 @@ The evaluation process is executed fully offline using the final trained BCQ mod
 | **Q-Value Ranking** | Statistical confirmation of conservatism. | $Q_{\text{Behavior}} < Q_{\text{BCQ}} < Q_{\text{Greedy}}$ |
 
 ---
-
-## References
-
-[1] BCQ Implementation. *Manus AI Internal Documentation*.
-[2] Le, H., et al. (2019). Batch-Constrained Q-Learning (BCQ). *International Conference on Machine Learning (ICML)*.
-[3] FQE (Fitted Q Evaluation). *Standard Offline RL Evaluation Method*.

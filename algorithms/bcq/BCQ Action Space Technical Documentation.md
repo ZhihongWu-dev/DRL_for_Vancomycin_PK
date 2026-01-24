@@ -84,7 +84,7 @@ The input action $a$ for the actor loss is sampled from the VAE at the current s
 ### Data Flow and Preprocessing
 The data flow follows standard offline RL practices:
 
-1.  **Data Source**: `ready_data.xlsx` (converted to transitions).
+1.  **Data Source**: `ready_data_v2.xlsx` (converted to transitions).
 2.  **Preprocessing**:
     *   State features are normalized using a `StandardScaler` (fit on training data).
     *   Actions (`totalamount_mg`) are normalized to the $[-1, 1]$ range.
@@ -145,8 +145,3 @@ The BCQ architecture inherently promotes safety by:
 3.  **Double Q-Learning**: Using $\min(Q_1, Q_2)$ for conservative value estimation.
 
 ---
-
-## References
-
-[1] BCQ Implementation. *Manus AI Internal Documentation*.
-[2] Fujimoto, S., Meger, D., & Precup, D. (2019). Off-Policy Deep Reinforcement Learning without Catastrophic Forgetting. *International Conference on Machine Learning (ICML)*.
